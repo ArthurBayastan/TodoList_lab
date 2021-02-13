@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import Addtodo from "../../Components/Addtodo/Addtodo";
 import Displaytodo from "../../Components/Displaytodo/Displaytodo";
@@ -14,42 +14,39 @@ const Todolist = () => {
   const [taskList, setTaskList] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  //
   axios.interceptors.request.use((req) => {
-    console.log("[in request interceptor]", req);
+    // console.log("[in request interceptor]", req);
     return req;
   });
 
   axios.interceptors.response.use(
     (res) => {
-      console.log("[in response interceptor]", res);
+      // console.log("[in response interceptor]", res);
       setLoading(false);
       return res;
     },
     (err) => {
-      console.log("[ in response ERR interceptor]", err);
+      // console.log("[ in response ERR interceptor]", err);
     }
   );
-  //
+
+  const getTaskList = useCallback(async () => {
+    const response = await axios.get(`${AXIOS_URL}/task.json`);
+    const fetchedData = [];
+    if (response.data !== null) {
+      for (let key in response.data) {
+        fetchedData.unshift({
+          ...response.data[key],
+          id: key,
+        });
+      }
+      setTaskList(fetchedData);
+    }
+  }, []);
 
   useEffect(() => {
-    const getTaskList = async () => {
-      const response = await axios.get(`${AXIOS_URL}/task.json`);
-      const fetchedData = [];
-      if (response.data !== null) {
-        for (let key in response.data) {
-          fetchedData.unshift({
-            ...response.data[key],
-            id: key,
-          });
-        }
-        // setLoading(false);
-        setTaskList(fetchedData);
-      }
-    };
-
     getTaskList().catch(console.error);
-  }, []);
+  }, [getTaskList]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -61,23 +58,27 @@ const Todolist = () => {
 
   const addTask = async (event) => {
     event.preventDefault();
+
     const taskObj = {
       ...todo,
       createdAt: new Date().toISOString().slice(0, 10),
+      done: false,
     };
+
     try {
       await axios.post(`${AXIOS_URL}/task.json`, taskObj);
     } finally {
       setTodo({ description: "" });
+      await getTaskList();
     }
-    window.location.reload();
   };
 
   const deleteTask = async (taskId) => {
     await axios
       .delete(`${AXIOS_URL}/task/${taskId}.json`)
       .then((response) => response);
-    window.location.reload();
+
+    await getTaskList();
   };
 
   return (
@@ -88,16 +89,23 @@ const Todolist = () => {
         add={addTask}
       />
       {loading && <Spinner />}
-      {taskList.map((task) => {
-        return (
-          <Displaytodo
-            key={task.id}
-            description={task.description}
-            created={task.createdAt}
-            remove={() => deleteTask(task.id)}
-          />
-        );
-      })}
+
+      <ol>
+        {taskList.map((task) => {
+          return (
+            <Displaytodo
+              key={task.id}
+              description={task.description}
+              created={task.createdAt}
+              remove={() => deleteTask(task.id)}
+              checked={task.done}
+              // changeChecked={() => !task.done}
+            />
+          );
+        })}
+      </ol>
+      {/* <input type="checkbox" checked={x} onChange={() => setX(!x)} />
+      <p className={x ? "zacherk" : ""}>Mirafaaaaaaaaal</p> */}
     </div>
   );
 };
